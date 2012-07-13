@@ -17,3 +17,9 @@ This code works well for MEG (magnetoencephalography) files saved from
 recent Matlab versions. For examples those you can find some of them
 here:
 ftp://ftp.fcdonders.nl/pub/biomag2012/
+
+
+USAGE
+
+#> python mat73_to_pickle.py <filename.mat>
+
