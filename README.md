@@ -21,5 +21,5 @@ ftp://ftp.fcdonders.nl/pub/biomag2012/
 
 USAGE
 
-#> python mat73_to_pickle.py <filename.mat>
+python mat73_to_pickle.py <filename.mat>
 
