@@ -62,9 +62,9 @@ def recursive_dict(f, root=None, name='root'):
             add_dtype_name(f, name)
             dtype = f.dtype
             if (np.prod(f.shape)*f.dtype.itemsize) > 2e9:
-                print "The array takes > 2Gb"
+                print "WARNING: The array", name, "requires > 2Gb"
                 if f.dtype.char=='d':
-                    print "Recasting", dtype, "to float32"
+                    print "\t Recasting", dtype, "to float32"
                     dtype = np.float32
                 else:
                     raise MemoryError
@@ -105,10 +105,7 @@ def recursive_dict(f, root=None, name='root'):
 if __name__ == '__main__':
 
     import sys
-    import pickle
-
-    pickling = True
-    joblibing = False
+    import cPickle as pickle
 
     filename = sys.argv[-1]
 
@@ -118,18 +115,9 @@ if __name__ == '__main__':
 
     data = recursive_dict(f)
 
-    # If you have enough memory just use pickle:
-    if pickling:
-        filename = filename[:-4]+".pickle"
-        print "Saving", filename
-        pickle.dump(data, open(filename,'w'),
-                    protocol=pickle.HIGHEST_PROTOCOL)
+    filename = filename[:-4]+".pickle"
+    print "Saving", filename
+    pickle.dump(data, open(filename,'w'),
+                protocol=pickle.HIGHEST_PROTOCOL)
 
-    # Otherwise use joblib, with no compression which is a
-    # streaming dumper. But then you have 1 file for each array...
-    if joblibing:
-        import joblib
-        filename = filename[:-4]+".joblib"
-        print "Saving", filename
-        print joblib.dump(data, filename, compress=0)
 
