@@ -39,10 +39,12 @@ def recursive_dict(f, root=None, name='root'):
 
     Note that this function works well on the Matlab7.3 datasets on
     which it was tested, but in general it might be wrong and it might
-    crash. The motivation is that it sometimes has to guess the
-    content of substructures so it might fail. One source of headache
-    seems to be Matlab7.3 format that represents strings as array of
-    integers so not using the string datatype.
+    crash. The motivation is that it has to guess the content of
+    substructures so it might fail. One source of headache seems to be
+    Matlab7.3 format that represents strings as array of 'uint16' so
+    not using the string datatype. For this reason it is not possible
+    to discriminate strings from arrays of integers without using
+    heuristics.
     """
     if root is None: root = f
     if hasattr(f, 'keys'):
@@ -54,7 +56,7 @@ def recursive_dict(f, root=None, name='root'):
             a[k] = recursive_dict(f[k], root, name=name+'->'+k)
         return a
     elif hasattr(f, 'shape'):
-        if f.dtype.str in ['<f8', '<u8']: # this is a numpy array
+        if f.dtype.name not in ['object', 'uint16']: # this is a numpy array
             # Check shape to assess whether it can fit in memory
             # or not. If not recast to a smaller dtype!
             add_dtype_name(f, name)
@@ -67,11 +69,11 @@ def recursive_dict(f, root=None, name='root'):
                 else:
                     raise MemoryError
             return np.array(f, dtype=dtype).squeeze()
-        if f.dtype.str in ['<u2']: # this is a string
+        elif f.dtype.name in ['uint16']: # this may be a string for Matlab
             add_dtype_name(f, name)
             try:
                 return string(f)
-            except ValueError:
+            except ValueError: # it wasn't...
                 print "WARNING:", name, ":"
                 print "\t", f
                 print "\t CONVERSION TO STRING FAILED, USING ARRAY!"
@@ -79,13 +81,15 @@ def recursive_dict(f, root=None, name='root'):
                 print "\t", tmp
                 return tmp
             pass
-        else: # this is a 2D array of HDF5 object references
+        elif f.dtype.name=='object': # this is a 2D array of HDF5 object references or just objects
             add_dtype_name(f, name)
             container = []
             for i in range(f.shape[0]):
                 for j in range(f.shape[1]):
-                    if str(f[i][j])=='<HDF5 object reference>':
+                    if str(f[i][j])=='<HDF5 object reference>': # reference follow it:
                         container.append(recursive_dict(root[f[i][j]], root, name=name))
+                    else:
+                        container.append(np.array(f[i][j]).squeeze())
             try:
                 return np.array(container).squeeze()
             except ValueError:
@@ -93,6 +97,8 @@ def recursive_dict(f, root=None, name='root'):
                 print "\t", container
                 print "\t CANNOT CONVERT INTO NON-OBJECT ARRAY"
                 return np.array(container, dtype=np.object).squeeze()
+        else:
+            raise NotImplemented
     return
 
     
@@ -105,7 +111,6 @@ if __name__ == '__main__':
     joblibing = False
 
     filename = sys.argv[-1]
-    filename = 'mcgurk_HC46840.mat'
 
     print "Loading", filename
 
