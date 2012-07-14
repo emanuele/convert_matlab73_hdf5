@@ -9,6 +9,8 @@ BSD License, 3 clauses.
 import numpy as np
 import h5py
 
+dtypes = {}
+
 
 def string(seq):
     """Convert a sequence of integers into a single string.
@@ -16,7 +18,19 @@ def string(seq):
     return ''.join([chr(a) for a in seq])
 
 
-def recursive_dict(f,root):
+def add_dtype_name(f, name):
+    """Keep track of all dtypes and names in the HDF5 file using it.
+    """
+    global dtypes
+    dtype = f.dtype            
+    if dtypes.has_key(dtype.name):
+        dtypes[dtype.name].add(name)
+    else:
+        dtypes[dtype.name] = set([name])
+    return
+
+
+def recursive_dict(f, root=None, name='root'):
     """This function recursively navigates the HDF5 structure from
     node 'f' and tries to unpack the data structure by guessing their
     content from dtype, shape etc.. It returns a dictionary of
@@ -30,18 +44,20 @@ def recursive_dict(f,root):
     seems to be Matlab7.3 format that represents strings as array of
     integers so not using the string datatype.
     """
+    if root is None: root = f
     if hasattr(f, 'keys'):
         a = dict(f)
         if u'#refs#' in a.keys(): # we don't want to keep this
             del(a[u'#refs#'])
         for k in a.keys():
             # print k
-            a[k] = recursive_dict(f[k], root)
+            a[k] = recursive_dict(f[k], root, name=name+'->'+k)
         return a
     elif hasattr(f, 'shape'):
         if f.dtype.str in ['<f8', '<u8']: # this is a numpy array
             # Check shape to assess whether it can fit in memory
             # or not. If not recast to a smaller dtype!
+            add_dtype_name(f, name)
             dtype = f.dtype
             if (np.prod(f.shape)*f.dtype.itemsize) > 2e9:
                 print "The array takes > 2Gb"
@@ -52,22 +68,30 @@ def recursive_dict(f,root):
                     raise MemoryError
             return np.array(f, dtype=dtype).squeeze()
         if f.dtype.str in ['<u2']: # this is a string
+            add_dtype_name(f, name)
             try:
                 return string(f)
             except ValueError:
+                print "WARNING:", name, ":"
+                print "\t", f
                 print "\t CONVERSION TO STRING FAILED, USING ARRAY!"
-                return np.array(f).squeeze()
+                tmp = np.array(f).squeeze()
+                print "\t", tmp
+                return tmp
             pass
         else: # this is a 2D array of HDF5 object references
+            add_dtype_name(f, name)
             container = []
             for i in range(f.shape[0]):
                 for j in range(f.shape[1]):
                     if str(f[i][j])=='<HDF5 object reference>':
-                        container.append(recursive_dict(root[f[i][j]], root))
+                        container.append(recursive_dict(root[f[i][j]], root, name=name))
             try:
                 return np.array(container).squeeze()
             except ValueError:
-                print container
+                print "WARNING:", name, ":"
+                print "\t", container
+                print "\t CANNOT CONVERT INTO NON-OBJECT ARRAY"
                 return np.array(container, dtype=np.object).squeeze()
     return
 
@@ -81,12 +105,13 @@ if __name__ == '__main__':
     joblibing = False
 
     filename = sys.argv[-1]
+    filename = 'mcgurk_HC46840.mat'
 
     print "Loading", filename
 
     f = h5py.File(filename)
 
-    data = recursive_dict(f, f)
+    data = recursive_dict(f)
 
     # If you have enough memory just use pickle:
     if pickling:
@@ -102,3 +127,4 @@ if __name__ == '__main__':
         filename = filename[:-4]+".joblib"
         print "Saving", filename
         print joblib.dump(data, filename, compress=0)
+
