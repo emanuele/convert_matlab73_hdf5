@@ -99,6 +99,8 @@ def recursive_dict(f, root=None, name='root'):
                 return np.array(container, dtype=np.object).squeeze()
         else:
             raise NotImplemented
+    else:
+        raise NotImplemented
     return
 
 
@@ -200,11 +202,11 @@ if __name__ == '__main__':
 
     print "Loading", filename
 
-    f = h5py.File(filename)
+    f = h5py.File(filename, mode='r')
 
-    # data = recursive_dict(f)
+    data = recursive_dict(f)
     # alternatively:
-    data = Node(f)
+    # data = Node(f)
     
     filename = filename[:-4]+".pickle"
     print "Saving", filename
